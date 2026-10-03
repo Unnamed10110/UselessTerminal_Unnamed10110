@@ -1,0 +1,15 @@
+/* Browser panel (§17.2). The .br-view placeholder is where the native child webview is drawn. */
+.browser-inner { display: flex; flex-direction: column; width: 100%; height: 100%; min-width: 0; background: var(--ui-chrome-bg); }
+/* Same height + accent underline as the main chrome bar so the two columns line up. */
+.br-nav { display: flex; align-items: center; gap: calc(3 * var(--u)); flex: none; height: calc(34 * var(--u)); padding: 0 calc(6 * var(--u)); border-bottom: calc(2 * var(--u)) solid var(--ui-accent); }
+.br-btn { flex: none; width: calc(26 * var(--u)); height: calc(26 * var(--u)); display: grid; place-items: center; padding: 0; background: transparent; border: 0; border-radius: 4px; }
+.br-btn:hover { background: var(--ui-hover-bg); }
+.br-btn .svg-icon { color: var(--ui-foreground); }
+.br-btn:focus-visible, .br-link:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+.br-addr { flex: 1; min-width: 0; height: calc(24 * var(--u)); padding: 0 calc(8 * var(--u)); background: var(--ui-input-bg); color: var(--ui-input-fg); border: 1px solid var(--ui-card-border); border-radius: 4px; }
+.br-addr:focus { border-color: var(--ui-accent); outline: none; }
+.br-links { display: flex; flex-wrap: wrap; gap: calc(4 * var(--u)); flex: none; padding: calc(6 * var(--u)); border-bottom: 1px solid var(--ui-card-border); }
+.br-link { padding: 1px calc(9 * var(--u)); font-size: var(--ui-font-size-small); background: var(--ui-card-bg); border: 1px solid var(--ui-card-border); border-radius: 999px; }
+.br-link:hover { background: var(--ui-hover-bg); border-color: var(--ui-accent); }
+.br-view { flex: 1; min-height: 0; display: grid; place-items: center; background: var(--ui-terminal-bg); }
+.br-note { padding: 16px; text-align: center; color: var(--ui-foreground-muted); font-size: var(--ui-font-size-small); }

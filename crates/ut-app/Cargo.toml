@@ -1,0 +1,56 @@
+[package]
+name = "useless-terminal"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+default-run = "UselessTerminal"
+
+[[bin]]
+name = "UselessTerminal"
+path = "src/main.rs"
+
+[features]
+default = ["browser-panel"]
+# The browser panel (§17) hosts a child WebView2 through `wry`. `--no-default-features` compiles it out: the panel
+# toggle then shows "The browser panel is not available in this build".
+browser-panel = ["dep:wry", "dep:webview2-com"]
+
+[dependencies]
+eframe.workspace = true
+egui.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+parking_lot.workspace = true
+tracing.workspace = true
+ut-term = { path = "../ut-term" }
+ut-pty = { path = "../ut-pty" }
+ut-fs = { path = "../ut-fs" }
+ut-core = { path = "../ut-core" }
+ut-data = { path = "../ut-data" }
+ut-shell = { path = "../ut-shell" }
+ut-ssh = { path = "../ut-ssh" }
+ut-vt-scan = { path = "../ut-vt-scan" }
+fontdb = "0.24"
+raw-window-handle = "0.6"
+arboard = { version = "3", default-features = false }
+tray-icon = "0.26"
+global-hotkey = "0.8"
+rfd = "0.17"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
+chrono.workspace = true
+regex.workspace = true
+percent-encoding.workspace = true
+# Child WebView2 host for the browser panel (feature `browser-panel`). Default features are the Linux backends only.
+wry = { version = "0.57", default-features = false, optional = true }
+# The page's accelerator-key event (app shortcuts typed while the page has focus); same version wry builds on.
+webview2-com = { version = "0.39", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = [
+  "Win32_Foundation", "Win32_System_Registry", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_System_Threading", "Win32_Graphics_Gdi", "Win32_Graphics_Dwm", "Win32_System_ProcessStatus", "Win32_Graphics_DirectWrite",
+  "Win32_Storage_FileSystem", "Win32_UI_HiDpi", "Win32_System_DataExchange", "Win32_System_Pipes", "Win32_System_IO", "Win32_Security",
+] }
+
+[build-dependencies]
+winresource = "0.1"

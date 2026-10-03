@@ -1,0 +1,14 @@
+{
+  "Bindings": {
+    "newTab": "Ctrl+T",
+    "settings": "Ctrl+OemComma",
+    "selectTab1": "Ctrl+D1",
+    "zoomIn": "Ctrl+OemPlus",
+    "zoomOut": "Ctrl+OemMinus",
+    "quake": "Win+Oem3",
+    "movePaneFocus": "Ctrl+Shift+Arrow",
+    "prevCommand": "Ctrl+Alt+Up",
+    "selectTabNumpad1": "Ctrl+Alt+NumPad1",
+    "search": "Ctrl+Shift+NoSuchKey"
+  }
+}

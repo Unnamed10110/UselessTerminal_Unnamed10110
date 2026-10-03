@@ -1,0 +1,28 @@
+{
+  "name": "useless-terminal-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 1420 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.12.1",
+    "@xterm/addon-clipboard": "0.2.0",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/addon-image": "0.9.0",
+    "@xterm/addon-search": "0.16.0",
+    "@xterm/addon-unicode11": "0.9.0",
+    "@xterm/addon-web-links": "0.12.0",
+    "@xterm/addon-webgl": "0.19.0",
+    "@xterm/xterm": "6.0.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.0"
+  }
+}

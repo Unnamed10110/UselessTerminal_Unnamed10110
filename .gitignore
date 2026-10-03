@@ -1,0 +1,50 @@
+# --- Rust build output (several GB; build with CARGO_TARGET_DIR outside this folder if it is synced) ---
+target/
+target-*/
+**/*.rs.bk
+*.pdb
+
+# --- packaging / release output (build.ps1, publish_github.ps1) ---
+/dist/
+*.exe
+*.msi
+*.msix
+*.zip
+*.wixpdb
+*.wixobj
+
+# --- secrets and signing material: never commit ---
+.env
+.env.*
+*.pfx
+*.p12
+*.pem
+*.key
+*.snk
+
+# --- scratch, logs, crash dumps ---
+*.log
+*.dmp
+*.bak
+*.tmp
+scripts/_*.ps1
+scripts/_*.txt
+
+# --- legacy Tauri/TypeScript code (kept only to port from) ---
+legacy/ui/node_modules/
+legacy/ui/dist/
+legacy/src-tauri/gen/
+
+# --- editors, OS, sync clients ---
+.vs/
+.vscode/
+.idea/
+*.swp
+*~
+~$*
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- local tool settings ---
+.claude/settings.local.json

@@ -1,0 +1,14 @@
+{
+  "Left": 120.5,
+  "Top": 80,
+  "Width": 1400,
+  "Height": 900.25,
+  "IsMaximized": false,
+  "SessionPanelOpen": true,
+  "SessionPanelWidth": 320,
+  "ActiveTabIndex": 1,
+  "Tabs": [
+    { "Title": "Terminal", "Command": "pwsh.exe", "WorkingDirectory": "C:\\Users\\sbritos\\OneDrive - BEPSA DEL PARAGUAY SAECA\\workspace_sbritos", "HighlightColor": "#FF00E5FF", "Renamed": false },
+    { "Title": "prod", "Command": "ssh.exe -p 2222 root@10.0.0.5", "StartingCommand": "tmux attach", "HighlightColor": "#FFFF003C", "Renamed": true }
+  ]
+}

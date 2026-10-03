@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Per-machine MSI (WiX 5: `wix build`, see scripts/package.ps1).
+  UpgradeCode is the SAME as the WPF MSI / old Inno Setup AppId on purpose: installing this upgrades that install.
+  Variables: Version (numeric major.minor.build), ExePath, IconPath, UtilCA (X64|A64).
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Package Name="Useless Terminal" Manufacturer="Useless Terminal" Version="$(Version)"
+           UpgradeCode="E8D4F9B2-6C1A-4F70-9E3D-2B7A8C5D1E0F" Scope="perMachine" Compressed="yes">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Useless Terminal is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Icon Id="AppIcon.ico" SourceFile="$(IconPath)" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+    <Property Id="DESKTOPSHORTCUT" Value="1" /> <!-- msiexec ... DESKTOPSHORTCUT=0 skips the desktop shortcut -->
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Useless Terminal" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+    <StandardDirectory Id="DesktopFolder" />
+
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Component Id="MainExe">
+        <File Id="UselessTerminal.exe" Source="$(ExePath)" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Component Id="StartMenuShortcut" Directory="ProgramMenuFolder">
+      <Shortcut Id="StartMenuLnk" Name="Useless Terminal" Target="[INSTALLFOLDER]UselessTerminal.exe" WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\UselessTerminal\Installer" Name="StartMenu" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+    <Component Id="DesktopShortcutComp" Directory="DesktopFolder" Condition="DESKTOPSHORTCUT = 1">
+      <Shortcut Id="DesktopLnk" Name="Useless Terminal" Target="[INSTALLFOLDER]UselessTerminal.exe" WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\UselessTerminal\Installer" Name="Desktop" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- Explorer: right-click a folder (or its background) → "Open in Useless Terminal" -->
+    <Component Id="ExplorerMenu" Directory="INSTALLFOLDER">
+      <RegistryKey Root="HKCR" Key="Directory\shell\UselessTerminal">
+        <RegistryValue Type="string" Value="Open in Useless Terminal" />
+        <RegistryValue Name="Icon" Type="string" Value="[INSTALLFOLDER]UselessTerminal.exe" />
+        <RegistryValue Key="command" Type="string" Value="&quot;[INSTALLFOLDER]UselessTerminal.exe&quot; --cwd &quot;%V&quot;" />
+      </RegistryKey>
+      <RegistryKey Root="HKCR" Key="Directory\Background\shell\UselessTerminal">
+        <RegistryValue Type="string" Value="Open in Useless Terminal" />
+        <RegistryValue Name="Icon" Type="string" Value="[INSTALLFOLDER]UselessTerminal.exe" />
+        <RegistryValue Key="command" Type="string" Value="&quot;[INSTALLFOLDER]UselessTerminal.exe&quot; --cwd &quot;%V&quot;" />
+      </RegistryKey>
+    </Component>
+
+    <Feature Id="Main" Title="Useless Terminal" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="DesktopShortcutComp" />
+      <ComponentRef Id="ExplorerMenu" />
+    </Feature>
+
+    <!-- UI: install-dir wizard without the licence page, plus a "Launch" checkbox on the last page. -->
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch Useless Terminal" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WixShellExecTarget" Value="[#UselessTerminal.exe]" />
+    <CustomAction Id="LaunchApplication" DllEntry="WixShellExec" Impersonate="yes" BinaryRef="Wix4UtilCA_$(UtilCA)" />
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <UI>
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" Order="2" Condition="NOT Installed" />
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
+    </UI>
+  </Package>
+</Wix>

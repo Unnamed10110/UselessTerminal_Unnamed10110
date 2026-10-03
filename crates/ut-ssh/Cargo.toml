@@ -1,0 +1,13 @@
+[package]
+name = "ut-ssh"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+uuid.workspace = true
+ut-fs = { path = "../ut-fs" }
+
+[dev-dependencies]
+serde_json.workspace = true

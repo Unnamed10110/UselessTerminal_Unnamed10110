@@ -1,0 +1,17 @@
+{
+  "FontSize": 12,
+  "Background": "#101010",
+  "Foreground": "#DDDDDD",
+  "White": "#EEEEEE",
+  "Cursor": "#00FF00",
+  "BrightBlack": "#777777",
+  "Red": "#CC0000",
+  "BrightRed": "#FF5555",
+  "BrightYellow": "#FFFF55",
+  "Green": "#00CC00",
+  "BrightGreen": "#55FF55",
+  "BrightCyan": "#55FFFF",
+  "Blue": "#0000CC",
+  "BrightBlue": "#5555FF",
+  "BrightMagenta": "#FF55FF"
+}

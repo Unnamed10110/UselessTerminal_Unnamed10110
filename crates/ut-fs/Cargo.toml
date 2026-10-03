@@ -1,0 +1,15 @@
+[package]
+name = "ut-fs"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
