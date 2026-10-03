@@ -78,3 +78,10 @@ After Ctrl+C the block writer keeps delivering what conhost had already buffered
   CRT mode has scanlines, vignette and flicker but no text glow.
 - The NSIS installer script (`installer\UselessTerminal.nsi`) has never been built here (`makensis` is not installed).
 - Build output is large (several GB per target dir) and this repo lives under OneDrive: point `CARGO_TARGET_DIR` outside it.
+
+## Developer
+
+**Unnamed10110**
+
+- trojan.v6@gmail.com
+- sergiobritos10110@gmail.com
