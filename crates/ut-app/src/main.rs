@@ -83,7 +83,17 @@ fn main() -> eframe::Result {
         vp = vp.with_position([r.x as f32 / scale, r.y as f32 / scale]).with_inner_size([r.width as f32 / scale, r.height as f32 / scale]);
     }
     debug::log("main: run_native");
-    let opts = eframe::NativeOptions { viewport: vp, ..Default::default() };
+    let mut opts = eframe::NativeOptions { viewport: vp, ..Default::default() };
+    // wgpu probes Vulkan before DirectX. Intel's igvk64.dll access-violates during that probe
+    // (0xC0000005) and the process dies before DX12 is reached. DirectX 12 is the supported
+    // Windows stack; set WGPU_BACKEND to override.
+    #[cfg(windows)]
+    if std::env::var_os("WGPU_BACKEND").is_none() {
+        if let eframe::egui_wgpu::WgpuSetup::CreateNew(setup) = &mut opts.wgpu_options.wgpu_setup {
+            setup.instance_descriptor.backends = eframe::wgpu::Backends::DX12;
+            debug::log("main: wgpu backend dx12");
+        }
+    }
     let start = StartArgs::parse(&args);
     eframe::run_native(
         "Useless Terminal",
