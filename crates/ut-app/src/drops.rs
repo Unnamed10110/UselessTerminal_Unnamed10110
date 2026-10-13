@@ -147,7 +147,7 @@ impl App {
         }
         if paste {
             let q = ut_shell::quote_paths(p.kind, &paths.iter().map(|x| x.to_string_lossy().into_owned()).collect::<Vec<_>>());
-            session.write(format!("{q} ").as_bytes());
+            session.write_input(format!("{q} ").as_bytes());
             return;
         }
         let snap = Snapshot {

@@ -99,7 +99,7 @@ impl App {
             if let (Some(vk), Some(t)) = (vk, self.tabs.get(self.active)) {
                 if let Some(s) = t.focused_pane().and_then(|p| p.session.clone()) {
                     if let Some(b) = encode_key(vk, m, s.mode()) {
-                        s.write(&b);
+                        s.write_input(&b);
                     }
                 }
             }
@@ -604,7 +604,7 @@ impl App {
             self.write_paste(pane, &format!("{q} "));
         } else if c.has_image {
             // Clipboard-aware CLIs (Claude Code, Codex) read the image from the OS clipboard on Ctrl+V (§5.6).
-            s.write(&[0x16]);
+            s.write_input(&[0x16]);
         }
     }
 
@@ -620,11 +620,11 @@ impl App {
     fn write_to_targets(&mut self, pane: u64, bytes: &[u8]) {
         let Some(t) = self.tabs.get(self.active) else { return };
         let Some(s) = t.pane(pane).and_then(|p| p.session.clone()) else { return };
-        s.write(bytes);
+        s.write_input(bytes);
         if t.broadcast {
             for o in t.panes.iter().filter(|o| o.id != pane && !o.read_only && !o.exited) {
                 if let Some(os) = &o.session {
-                    os.write(bytes);
+                    os.write_input(bytes);
                 }
             }
         }

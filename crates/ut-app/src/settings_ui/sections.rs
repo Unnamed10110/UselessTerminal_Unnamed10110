@@ -188,7 +188,7 @@ pub fn behavior(ui: &mut Ui, _x: &mut PanelCtx, f: &mut Form, _cfg: &Settings) {
     });
     Form::group(ui, th, "Shell integration", |ui| {
         Form::grid(ui, "integration", |ui| {
-            f.check(ui, "terminal.overridePsReadLineColors", "Colour PowerShell input", "Typed text uses your typed-input colour (Theme page)");
+            f.check(ui, "terminal.overridePsReadLineColors", "Colour PowerShell input", "Plain typed text uses your typed-input colour (Theme page); syntax highlighting is kept");
         });
     });
 }

@@ -511,9 +511,13 @@ mod tests {
             "'[?2004h'",
             "Import-Module PSReadLine -ErrorAction Stop",
             "$vt = $global:__utE + '[38;2;16;32;48m'",
-            "Command = $vt; Default = $vt; Number = $vt; Parameter = $vt; Operator = $vt",
+            "-Colors @{ Default = $vt }",
         ] {
             assert!(s.contains(marker), "missing {marker:?}");
+        }
+        // syntax highlighting survives: no other token colour is overridden
+        for token in ["Command =", "Keyword =", "String =", "Parameter =", "Variable =", "Operator =", "Number =", "Type =", "Member ="] {
+            assert!(!s.contains(token), "PSReadLine token colour {token:?} must stay untouched");
         }
         assert!(!s.contains("{R}") && !s.contains("{G}") && !s.contains("{B}") && !s.contains("{STARTB64}"));
         assert!(!s.contains("Invoke-Expression"), "no start block without a starting command");

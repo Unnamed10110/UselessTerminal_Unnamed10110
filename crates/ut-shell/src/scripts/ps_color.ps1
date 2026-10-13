@@ -3,10 +3,9 @@ function global:__utApplyInputColor {
   try {
     Import-Module PSReadLine -ErrorAction Stop
     $vt = $global:__utE + '[38;2;{R};{G};{B}m'
-    Set-PSReadLineOption -ErrorAction Stop -Colors @{
-      Command = $vt; Default = $vt; Number = $vt; Parameter = $vt; Operator = $vt
-      Member = $vt; Variable = $vt; Keyword = $vt; Type = $vt; String = $vt
-    }
+    # Only the plain-text token: commands, keywords, parameters, strings... keep PSReadLine's own syntax colours
+    # (or the ones the user's profile set), otherwise everything typed would look the same.
+    Set-PSReadLineOption -ErrorAction Stop -Colors @{ Default = $vt }
     $global:__utInputColorApplied = $true
   } catch {}
 }

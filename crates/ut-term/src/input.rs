@@ -270,7 +270,7 @@ impl Router {
         if let Some(bytes) = encode_key(vk, m, mode) {
             self.state.lock().swallow_char = true;
             for t in &targets {
-                t.write(&bytes);
+                t.write_input(&bytes);
             }
             return true;
         }
@@ -309,7 +309,7 @@ impl Router {
         }
         out.extend_from_slice(ch.encode_utf8(&mut buf).as_bytes());
         for t in &targets {
-            t.write(&out);
+            t.write_input(&out);
         }
         true
     }

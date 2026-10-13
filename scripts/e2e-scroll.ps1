@@ -29,6 +29,25 @@ Check 'SB_TOP reaches the start of the scrollback' ($top -lt $bottom - 400) "top
 Vscroll 7; $end = Get-Vtop
 Check 'SB_BOTTOM returns to the live screen' ($end -eq $bottom) "now=$end"
 
+# Typing with the prompt out of sight brings the view back to it (every terminal's "scroll on keystroke").
+# The live bottom moves as soon as PSReadLine draws its prediction list, so compare with what SB_BOTTOM reports afterwards.
+function Live-Bottom { Vscroll 7; Get-Vtop }
+Vscroll 6; $far = Get-Vtop
+Check 'scrolled to the top again' ($far -lt $bottom - 400) "now=$far"
+Send-Text 'x'; Start-Sleep -Milliseconds 700
+$snapped = Get-Vtop; $live = Live-Bottom
+Check 'typing a character returns to the prompt' ($snapped -eq $live -and $snapped -gt $far + 400) "after typing=$snapped live bottom=$live"
+Send-Vk 0x08; Start-Sleep -Milliseconds 400    # backspace: leave the line empty
+$live = Live-Bottom; Vscroll 2; $up = Get-Vtop
+Check 'scrolled up one page' ($up -lt $live - 5) "now=$up live=$live"
+Send-Vk 0x26 -Ext; Start-Sleep -Milliseconds 700    # Up arrow (history) is input too
+$snapped = Get-Vtop; $live = Live-Bottom
+Check 'a cursor key returns to the prompt as well' ($snapped -eq $live) "after Up=$snapped live bottom=$live"
+Send-Vk 0x1B; Start-Sleep -Milliseconds 300    # Esc clears the recalled line
+Vscroll 6; $far = Get-Vtop
+Send-Vk 0x21 -Shift -Ext; Start-Sleep -Milliseconds 500   # Shift+PageUp is a scroll command, NOT input: it must not snap down
+Check 'scroll shortcuts do not snap the view back down' ((Get-Vtop) -lt $far + 100) "now=$(Get-Vtop) (was $far at the top)"
+
 Stop-App
 $script:Results | Format-Table -AutoSize
 if ($script:Results | Where-Object { -not $_.Pass }) { exit 1 }

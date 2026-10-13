@@ -673,7 +673,7 @@ Per-session setting: `integration: "auto" | "off"`.
 ### 6.6 Typed-input color [P1]
 The goal: what the user types is shown in `terminal.typedInputColor`, which is a personal setting that theme presets never change (§13.4). Two mechanisms:
 
-1. **PowerShell.** Run `__utApplyInputColor` (Appendix A.1) once per session. It sets every PSReadLine token color (Command, Default, Number, Parameter, Operator, Member, Variable, Keyword, Type, String) to `ESC[38;2;r;g;bm`.
+1. **PowerShell.** Run `__utApplyInputColor` (Appendix A.1) once per session. It sets **only the `Default` PSReadLine token color** (plain text) to `ESC[38;2;r;g;bm`. Every other token (Command, Keyword, Parameter, String, Operator, Variable, Number, Type, Member, Comment...) keeps PSReadLine's own color or the user's profile color, so syntax highlighting still works while typing. (Setting all ten to one color, as the WPF version did, removes highlighting: a defect, not parity.)
    - Setting `terminal.overridePsReadLineColors` (default `true` for parity).
    - Why it runs late: *"PSReadLine is not imported yet during -EncodedCommand; apply from prompt/OnIdle with 24-bit VT; '#RRGGBB' does not work on older builds."*
 2. **Every other shell (mainly cmd).** Write `ESC[38;2;r;g;bm` into **xterm only** (not to the PTY) when entering `phase = input` (OSC 133;B). Write `ESC[39m` locally when the user presses Enter, or when `C` arrives.
@@ -2367,10 +2367,8 @@ function global:__utApplyInputColor {
   try {
     Import-Module PSReadLine -ErrorAction Stop
     $vt = $global:__utE + '[38;2;{R};{G};{B}m'
-    Set-PSReadLineOption -ErrorAction Stop -Colors @{
-      Command = $vt; Default = $vt; Number = $vt; Parameter = $vt; Operator = $vt
-      Member = $vt; Variable = $vt; Keyword = $vt; Type = $vt; String = $vt
-    }
+    # Only the plain-text token: the other tokens keep PSReadLine's syntax colours (see §6.6).
+    Set-PSReadLineOption -ErrorAction Stop -Colors @{ Default = $vt }
     $global:__utInputColorApplied = $true
   } catch {}
 }

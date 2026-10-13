@@ -123,3 +123,48 @@ fn replay_captured_stream() {
     }
     println!("history={} cursor={:?}", term.grid().history_size(), term.grid().cursor.point);
 }
+
+#[test]
+fn typing_snaps_a_scrolled_up_view_back_to_the_prompt() {
+    let (inner, _) = new_inner(&cfg(5, 200));
+    feed(&inner, &lines(60, "row"));
+    inner.term.lock().scroll_display(alacritty_terminal::grid::Scroll::Delta(20));
+    assert_eq!(inner.term.lock().grid().display_offset(), 20, "the view is scrolled up");
+    assert!(inner.snap_to_bottom(), "input while scrolled up snaps");
+    assert_eq!(inner.term.lock().grid().display_offset(), 0);
+    assert!(inner.snapped.swap(false, std::sync::atomic::Ordering::AcqRel), "the view is told about it once");
+    assert!(!inner.snap_to_bottom(), "already at the bottom: nothing to do");
+    assert!(!inner.snapped.load(std::sync::atomic::Ordering::Acquire));
+}
+
+/// What a double press + drag relies on: a Semantic/Lines selection re-expands to whole words/lines at the pointer's new
+/// end in BOTH drag directions, while the anchor word/line stays selected.
+#[test]
+fn word_and_line_selections_expand_in_both_drag_directions() {
+    use alacritty_terminal::index::{Column, Line, Point, Side};
+    use alacritty_terminal::selection::{Selection, SelectionType};
+    let (inner, _) = new_inner(&cfg(5, 100));
+    feed(&inner, b"foo bar baz
+");
+    let term = inner.term.lock();
+    let at = |col: usize| Point::new(Line(0), Column(col));
+    let cols = |sel: &Selection| {
+        let r = sel.to_range(&*term).expect("a range");
+        (r.start.column.0, r.end.column.0)
+    };
+    // f0 o1 o2 _3 b4 a5 r6 _7 b8 a9 z10: double press inside "bar", drag right into "baz"
+    let mut sel = Selection::new(SelectionType::Semantic, at(5), Side::Left);
+    assert_eq!(cols(&sel), (4, 6), "the pressed word");
+    sel.update(at(9), Side::Left);
+    assert_eq!(cols(&sel), (4, 10), "bar baz");
+    sel.update(at(1), Side::Left);
+    assert_eq!(cols(&sel), (0, 6), "dragged back over foo: foo bar (the anchor word stays)");
+    // double press inside "baz", drag left to "foo"
+    let mut sel = Selection::new(SelectionType::Semantic, at(9), Side::Left);
+    sel.update(at(1), Side::Left);
+    assert_eq!(cols(&sel), (0, 10), "foo bar baz");
+    // triple press: the whole (wrapped) line, whatever the drag column
+    let mut sel = Selection::new(SelectionType::Lines, at(5), Side::Left);
+    sel.update(at(2), Side::Left);
+    assert_eq!(cols(&sel), (0, 39), "the full 40-column row");
+}

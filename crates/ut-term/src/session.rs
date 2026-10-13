@@ -220,6 +220,8 @@ pub struct Inner {
     size: Mutex<(u16, u16)>,
     /// Every size the session had since it started, with the time (ms): diagnostics for resize-related glitches.
     resizes: Mutex<Vec<(u16, u16, u64)>>,
+    /// Set when typing brought a scrolled-up view back to the prompt (see [`TermSession::write_input`]).
+    pub(crate) snapped: AtomicBool,
 }
 
 pub struct TermSession {
@@ -231,6 +233,23 @@ pub struct TermSession {
 }
 
 impl Inner {
+    /// A scrolled-up view goes back to the live screen. `true` = it was scrolled (and `snapped` is now set).
+    pub(crate) fn snap_to_bottom(&self) -> bool {
+        let scrolled = {
+            let mut term = self.term.lock();
+            let scrolled = term.grid().display_offset() > 0;
+            if scrolled {
+                term.scroll_display(Scroll::Bottom);
+            }
+            scrolled
+        };
+        if scrolled {
+            self.snapped.store(true, Ordering::Release);
+            self.wake();
+        }
+        scrolled
+    }
+
     pub(crate) fn wake(&self) {
         // One pending repaint request at a time: a flood must not call into egui per frame.
         if !self.dirty.swap(true, Ordering::AcqRel) {
@@ -518,6 +537,18 @@ impl TermSession {
         self.pty().is_alive()
     }
 
+    /// Input the USER produced (typing, paste, IME, dropped paths): a scrolled-up view returns to the prompt first, like
+    /// every terminal's "scroll on keystroke". Replies to terminal queries and mouse reports keep using [`write`](Self::write).
+    pub fn write_input(&self, bytes: &[u8]) {
+        self.inner.snap_to_bottom();
+        self.write(bytes);
+    }
+
+    /// `true` once after typing snapped the view to the bottom (the view then forgets its command-jump anchor).
+    pub fn take_snapped(&self) -> bool {
+        self.inner.snapped.swap(false, Ordering::AcqRel)
+    }
+
     pub fn write(&self, bytes: &[u8]) {
         self.pty().write(bytes);
         if let Some(t) = self.inner.cast.lock().as_ref() {
@@ -777,6 +808,7 @@ pub(crate) fn new_inner(cfg: &SessionConfig) -> (Arc<Inner>, Arc<Shared>) {
             frames: AtomicU64::new(0),
             size: Mutex::new((cols, rows)),
             resizes: Mutex::new(vec![(cols, rows, 0)]),
+            snapped: AtomicBool::new(false),
         });
     (inner, shared)
 }

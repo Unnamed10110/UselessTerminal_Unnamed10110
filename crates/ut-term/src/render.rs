@@ -107,6 +107,10 @@ pub struct TermView {
     cell: (f32, f32),
     metric_key: (u32, u32, u32, u32),
     drag: Option<(SelectionType, Point, Side)>,
+    /// The last primary press: time (egui seconds), position and click count (1, 2, 3), to tell double and triple presses.
+    last_press: Option<(f64, Pos2, u8)>,
+    /// Top-left of the cell grid in the last frame (points, window coordinates): lets tests aim the mouse at a cell.
+    origin: Pos2,
     pub nav_anchor: Option<i64>,
     scroll_acc: f32,
     zoom_acc: f32,
@@ -126,6 +130,8 @@ impl TermView {
             cell: (8.0, 16.0),
             metric_key: (0, 0, 0, 0),
             drag: None,
+            last_press: None,
+            origin: Pos2::ZERO,
             nav_anchor: None,
             scroll_acc: 0.0,
             zoom_acc: 0.0,
@@ -142,6 +148,11 @@ impl TermView {
 
     pub fn cell_size(&self) -> (f32, f32) {
         self.cell
+    }
+
+    /// Top-left of the cell grid in the last frame (points, window coordinates).
+    pub fn grid_origin(&self) -> Pos2 {
+        self.origin
     }
 
     fn metrics(&mut self, ui: &Ui, o: &ViewOptions) -> (f32, f32) {
@@ -163,8 +174,12 @@ impl TermView {
         let (cw, ch) = self.metrics(ui, o);
         out.cell = (cw, ch);
         s.set_cell_size(cw, ch);
+        if s.take_snapped() {
+            self.nav_anchor = None; // typing brought the view back to the prompt: the next Ctrl+Alt+Up starts from there
+        }
 
-        let inner = Rect::from_min_max(rect.min + o.padding, rect.max - Vec2::new(o.padding.x + if o.scrollbar { SCROLLBAR_WIDTH } else { 0.0 } + if o.minimap { crate::effects::MINIMAP_WIDTH } else { 0.0 }, o.padding.y));
+        let inner =Rect::from_min_max(rect.min + o.padding, rect.max - Vec2::new(o.padding.x + if o.scrollbar { SCROLLBAR_WIDTH } else { 0.0 } + if o.minimap { crate::effects::MINIMAP_WIDTH } else { 0.0 }, o.padding.y));
+        self.origin = inner.min;
         let (c, r) = cells_that_fit(rect.size(), o.padding, o.scrollbar, o.minimap, (cw, ch));
         let (cols, rows) = (c.max(2) as u16, r.max(1) as u16);
         s.resize(cols, rows);
@@ -225,6 +240,7 @@ impl TermView {
         }
 
         if mouse_mode {
+            self.drag = None;
             self.report_mouse(ui, s, &snap, &resp, in_inner, &to_cell);
         } else {
             self.selection(ui, s, &snap, o, &resp, inner, &to_cell, &to_point, hover_link.as_ref().map(|(_, l)| l), &mut out);
@@ -253,7 +269,7 @@ impl TermView {
         for ev in ui.input(|i| i.events.clone()) {
             if let Event::Ime(egui::ImeEvent::Commit(t)) = ev {
                 if has_focus && !t.is_empty() {
-                    s.write(t.as_bytes());
+                    s.write_input(t.as_bytes());
                 }
             }
         }
@@ -328,14 +344,12 @@ impl TermView {
     ) {
         let alt = ui.input(|i| i.modifiers.alt);
         let ctrl = ui.input(|i| i.modifiers.ctrl);
-        if resp.clicked_by(PointerButton::Primary) {
-            if ctrl {
-                if let Some(l) = link {
-                    out.link_click = Some(l.clone());
-                    return;
-                }
+        // Ctrl+click on a link opens it (the press handling below leaves the selection alone in that case).
+        if resp.clicked_by(PointerButton::Primary) && ctrl {
+            if let Some(l) = link {
+                out.link_click = Some(l.clone());
+                return;
             }
-            s.clear_selection();
         }
         if resp.secondary_clicked() {
             out.context_menu = ui.input(|i| i.pointer.interact_pos());
@@ -349,21 +363,39 @@ impl TermView {
             s.inner.clear_dirty();
             (ty, pt, side)
         };
-        if resp.double_clicked_by(PointerButton::Primary) {
-            if let Some(p) = resp.interact_pointer_pos() {
-                start_sel(SelectionType::Semantic, p);
-                if o.copy_on_select {
-                    copy_selection(s);
+        // Click counts are decided at PRESS time: egui reports clicks only on release, which is too late to start a
+        // word-wise drag. A double press selects the word, a triple press the line, and holding the button then drags
+        // from there (alacritty re-expands a Semantic/Lines selection to whole words/lines at every `update`).
+        let max_delay = double_click_secs();
+        for ev in ui.input(|i| i.events.clone()) {
+            let Event::PointerButton { pos, button: PointerButton::Primary, pressed: true, modifiers } = ev else { continue };
+            if !(resp.hovered() || resp.is_pointer_button_down_on()) || !inner.contains(pos) || (modifiers.ctrl && link.is_some()) {
+                continue;
+            }
+            let now = ui.input(|i| i.time);
+            let n = click_count(self.last_press, now, pos, max_delay);
+            self.last_press = Some((now, pos, n));
+            match n {
+                2 => self.drag = Some(start_sel(SelectionType::Semantic, pos)),
+                3 => self.drag = Some(start_sel(SelectionType::Lines, pos)),
+                _ if modifiers.shift && s.has_selection() => {
+                    // Shift+click extends the existing selection to the clicked cell, and a drag continues from there.
+                    let (c, r, side) = to_cell(pos);
+                    let pt = to_point(c, r);
+                    let mut term = s.inner.term.lock();
+                    if let Some(sel) = term.selection.as_mut() {
+                        sel.update(pt, side);
+                        self.drag = Some((sel.ty, pt, side));
+                    }
+                }
+                _ => {
+                    s.clear_selection();
+                    self.drag = None;
                 }
             }
-        } else if resp.triple_clicked_by(PointerButton::Primary) {
-            if let Some(p) = resp.interact_pointer_pos() {
-                start_sel(SelectionType::Lines, p);
-                if o.copy_on_select {
-                    copy_selection(s);
-                }
-            }
-        } else if resp.drag_started_by(PointerButton::Primary) {
+        }
+        // A plain drag starts a character selection (Alt: block), unless a double/triple press already made one.
+        if resp.drag_started_by(PointerButton::Primary) && self.drag.is_none() {
             if let Some(p) = ui.input(|i| i.pointer.press_origin()) {
                 self.drag = Some(start_sel(if alt { SelectionType::Block } else { SelectionType::Simple }, p));
             }
@@ -384,11 +416,9 @@ impl TermView {
                 ui.ctx().request_repaint();
             }
         }
-        if resp.drag_stopped() {
-            self.drag = None;
-            if o.copy_on_select {
-                copy_selection(s);
-            }
+        // Button up (also after a double press that never moved, where egui reports no drag): the selection is final.
+        if ui.input(|i| i.pointer.button_released(PointerButton::Primary)) && self.drag.take().is_some() && o.copy_on_select {
+            copy_selection(s);
         }
         let _ = snap;
     }
@@ -514,6 +544,23 @@ impl TermView {
             }
         }
     }
+}
+
+/// Pointer travel (points) within which two presses still count as the same spot (egui's `max_click_dist`).
+const CLICK_SLOP: f32 = 6.0;
+
+/// Click count of a press: the same spot within the double-click time continues the series 1 -> 2 -> 3 -> 1.
+fn click_count(prev: Option<(f64, Pos2, u8)>, now: f64, pos: Pos2, max_delay: f64) -> u8 {
+    match prev {
+        Some((t, p, n)) if now - t <= max_delay && (pos - p).length() <= CLICK_SLOP => n % 3 + 1,
+        _ => 1,
+    }
+}
+
+/// The user's Windows double-click time, in seconds (`GetDoubleClickTime`, default 0.5 s).
+fn double_click_secs() -> f64 {
+    use windows::Win32::UI::Input::KeyboardAndMouse::GetDoubleClickTime;
+    (unsafe { GetDoubleClickTime() } as f64 / 1000.0).clamp(0.2, 2.0)
 }
 
 fn mod_bits(m: egui::Modifiers) -> u8 {
@@ -860,3 +907,29 @@ fn paint_cursor(p: &egui::Painter, s: &Snap, o: &ViewOptions, origin: Pos2, cw: 
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const DELAY: f64 = 0.5;
+
+    #[test]
+    fn presses_on_the_same_spot_count_up_and_wrap() {
+        let p = Pos2::new(100.0, 50.0);
+        let one = click_count(None, 10.0, p, DELAY);
+        assert_eq!(one, 1);
+        let two = click_count(Some((10.0, p, one)), 10.2, p, DELAY);
+        assert_eq!(two, 2);
+        let three = click_count(Some((10.2, p, two)), 10.4, Pos2::new(103.0, 51.0), DELAY);
+        assert_eq!(three, 3, "a couple of points of jitter is still the same spot");
+        assert_eq!(click_count(Some((10.4, p, three)), 10.6, p, DELAY), 1, "a fourth press starts a new series");
+    }
+
+    #[test]
+    fn slow_or_distant_presses_start_over() {
+        let p = Pos2::new(100.0, 50.0);
+        assert_eq!(click_count(Some((10.0, p, 1)), 10.9, p, DELAY), 1, "too slow");
+        assert_eq!(click_count(Some((10.0, p, 1)), 10.2, Pos2::new(120.0, 50.0), DELAY), 1, "moved away");
+        assert_eq!(click_count(Some((10.0, p, 2)), 10.2, Pos2::new(100.0, 70.0), DELAY), 1, "moved to another line");
+    }
+}

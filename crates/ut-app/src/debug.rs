@@ -44,6 +44,10 @@ impl App {
             self.debug_last_dump = Some(std::time::Instant::now());
             if let Some(s) = self.focused_session() {
                 let flags = format!("window_focused={} term_focus={} refocus={} focused_id={:?} view_id={:?} router={} modal={} sidebar={}", self.window_focused, self.debug_term_focus(ctx), self.refocus, ctx.memory(|m| m.focused()), self.tabs.get(self.active).and_then(|t| t.focused_pane()).map(|p| p.view.id()), self.router.enabled.load(std::sync::atomic::Ordering::Relaxed), self.any_modal(), self.sidebar_open);
+                // selection text and where the cell grid is on screen: lets end-to-end tests aim the mouse at a cell
+                let (cell, origin) = self.tabs.get(self.active).and_then(|t| t.focused_pane()).map_or(((0.0, 0.0), Default::default()), |p| (p.view.cell_size(), p.view.grid_origin()));
+                let sel = s.selection_text().map(|t| t.chars().take(120).collect::<String>());
+                let flags = format!("{flags} sel={sel:?} cell={:.3}x{:.3} origin={:.2},{:.2} ppp={:.3}", cell.0, cell.1, origin.x, origin.y, ctx.pixels_per_point());
                 let _ = std::fs::write(&dump, format!("{flags}\n{}", dump_text(&s, every >= Duration::from_millis(100))));
             }
             let _ = std::fs::write(with(".browser"), format!("open={} {}", self.browser_open, self.browser.debug_state()));

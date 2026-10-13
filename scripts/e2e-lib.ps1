@@ -13,6 +13,19 @@ public static class UtIn {
   [StructLayout(LayoutKind.Sequential)] struct INPUT { public uint type; public U u; }
   [DllImport("user32.dll")] static extern uint SendInput(uint n, INPUT[] i, int size);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr h);
+  [DllImport("user32.dll")] static extern bool AttachThreadInput(uint from, uint to, bool attach);
+  [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+  // The reliable way for a background process to take the foreground: share the input queue of the current foreground
+  // window's thread for a moment (an Alt tap alone fails while another app, e.g. Excel, holds the foreground lock).
+  public static bool Force(IntPtr h) {
+    IntPtr fg = GetForegroundWindow(); uint pid;
+    uint fgThread = GetWindowThreadProcessId(fg, out pid), me = GetCurrentThreadId();
+    bool attached = fgThread != 0 && fgThread != me && AttachThreadInput(me, fgThread, true);
+    SetForegroundWindow(h); BringWindowToTop(h);
+    if (attached) AttachThreadInput(me, fgThread, false);
+    return GetForegroundWindow() == h;
+  }
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int cmd);
   [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
@@ -95,6 +108,7 @@ function Focus-App([switch]$Click) {
   [UtIn]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [UtIn]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
   [void][UtIn]::ShowWindow((Get-AppHwnd), 9)
   [void][UtIn]::SetForegroundWindow((Get-AppHwnd))
+  for ($i = 0; $i -lt 4 -and [UtIn]::GetForegroundWindow() -ne (Get-AppHwnd); $i++) { [void][UtIn]::Force((Get-AppHwnd)); Start-Sleep -Milliseconds 250 }
   Start-Sleep -Milliseconds 300
   Assert-Fg
   # Optional real click in the terminal area (the app must NOT need it to accept typing).
