@@ -25,7 +25,8 @@ Windows only (ConPTY). The executable is `UselessTerminal.exe`.
 ## Build and test
 
 ```powershell
-.\build.ps1                              # release exe -> dist\x64\UselessTerminal.exe and MSI -> dist\*.msi (needs WiX 5, see the header)
+.\build.ps1                              # release exe -> dist\x64\UselessTerminal.exe; the build output is deleted afterwards (-KeepTarget keeps it)
+.\build.ps1 -Msi                         # also the MSI -> dist\*.msi (needs WiX 5, see the header)
 .\publish_github.ps1 v0.1.0 -WhatIf       # dry run; without -WhatIf it builds and publishes the exe (+ .sha256) as a GitHub release (needs gh)
 cargo build -p useless-terminal          # package name, not the crate directory
 cargo test --workspace

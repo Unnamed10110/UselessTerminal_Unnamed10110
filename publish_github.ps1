@@ -77,10 +77,10 @@ if ($inGit) {
 $arch = 'x64'
 if (-not $SkipBuild) {
   $global:LASTEXITCODE = 0
-  if ($WhatIfPreference) { Write-Host "What if: .\build.ps1 -Arch $arch$(if (-not $Msi) { ' -NoMsi' })" }
+  if ($WhatIfPreference) { Write-Host "What if: .\build.ps1 -Arch $arch$(if ($Msi) { ' -Msi' })" }
   else {
     $buildArgs = @{ Arch = $arch }
-    if (-not $Msi) { $buildArgs.NoMsi = $true }
+    if ($Msi) { $buildArgs.Msi = $true }
     & "$PSScriptRoot\build.ps1" @buildArgs
     if ($LASTEXITCODE) { throw "build.ps1 did not finish cleanly (exit $LASTEXITCODE). Close any running UselessTerminal.exe from dist\$arch and retry." }
   }
@@ -105,7 +105,7 @@ Set-Content -Path (Join-Path $stage "$assetName.sha256") -Value "$hash  $assetNa
 $assets = @((Join-Path $stage $assetName), (Join-Path $stage "$assetName.sha256"))
 if ($Msi) {
   $msiFile = Join-Path $PSScriptRoot "dist\UselessTerminal-$cargoVersion-$arch.msi"
-  if (-not (Test-Path $msiFile)) { throw "$msiFile not found. Run .\build.ps1 first (or drop -SkipBuild)." }
+  if (-not (Test-Path $msiFile)) { throw "$msiFile not found. Run .\build.ps1 -Msi first (or drop -SkipBuild)." }
   Copy-Item $msiFile $stage -WhatIf:$false
   $assets += (Join-Path $stage (Split-Path $msiFile -Leaf))
 }

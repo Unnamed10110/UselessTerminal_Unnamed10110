@@ -1,11 +1,15 @@
-# Builds the release binary and the MSI installer.
-#   .\build.ps1 [-Arch x64|arm64] [-OutDir dist] [-SkipBuild] [-NoMsi]
+# Builds the release binary (and, with -Msi, the installer), then deletes everything else the build left behind.
+#   .\build.ps1 [-Arch x64|arm64] [-OutDir dist] [-Msi] [-KeepTarget] [-SkipBuild]
 #
-# Output (under -OutDir, default .\dist):
-#   <arch>\UselessTerminal.exe              the program, runs as is (no installer needed)
-#   UselessTerminal-<version>-<arch>.msi    per-machine installer
+# Output (under -OutDir, default .\dist) - nothing else is left:
+#   <arch>\UselessTerminal.exe              the program, one self-contained file (no installer needed)
+#   UselessTerminal-<version>-<arch>.msi    per-machine installer, only with -Msi
 #
-# Needs: Rust (cargo) and, for the MSI, WiX 5 with its UI and Util extensions:
+# Cleanup: the cargo target directory (several GB) is deleted after the build, so every build is a full one (a few
+# minutes). -KeepTarget keeps it for fast incremental builds. Stale installers and publish_github.ps1 staging in
+# -OutDir are removed too.
+#
+# Needs: Rust (cargo) and, for -Msi, WiX 5 with its UI and Util extensions:
 #   dotnet tool install -g wix --version 5.0.2
 #   wix extension add -g WixToolset.UI.wixext/5.0.2
 #   wix extension add -g WixToolset.Util.wixext/5.0.2
@@ -14,13 +18,14 @@
 # WARNING: the MSI deliberately shares its UpgradeCode with the old WPF installer. Installing it REPLACES the WPF
 # Useless Terminal on that machine.
 #
-# Build output is several GB. If this folder is synced (OneDrive), build elsewhere:
+# Build output is several GB while it exists. If this folder is synced (OneDrive), build elsewhere:
 #   $env:CARGO_TARGET_DIR = "$env:LOCALAPPDATA\ut-target"; .\build.ps1
 param(
   [ValidateSet('x64', 'arm64')][string]$Arch = 'x64',
   [string]$OutDir = 'dist',
-  [switch]$SkipBuild,
-  [switch]$NoMsi
+  [switch]$Msi,
+  [switch]$KeepTarget,
+  [switch]$SkipBuild
 )
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
@@ -59,20 +64,34 @@ catch {
   $locked = $true
   $exe = Join-Path $archDir 'UselessTerminal.new.exe'
   Copy-Item $built $exe -Force
-  Write-Warning "$archDir\UselessTerminal.exe is in use (a running instance?). The new binary was saved as UselessTerminal.new.exe: close the app, then re-run '.\build.ps1 -SkipBuild' (or rename it yourself)."
+  Write-Warning "$archDir\UselessTerminal.exe is in use (a running instance?). The new binary was saved as UselessTerminal.new.exe: close the app, then rename it over UselessTerminal.exe (the build output is deleted below, so it cannot be copied again)."
 }
 Write-Host "binary: $((Resolve-Path $exe).Path)  ($([math]::Round((Get-Item $exe).Length / 1MB, 1)) MB)"
 
-# ---- MSI ----
-if ($NoMsi) { return }
-if (-not (Get-Command wix -ErrorAction SilentlyContinue)) {
-  throw "wix not found, so no MSI was built. Install it with: dotnet tool install -g wix --version 5.0.2   (the binary above is ready)"
+# ---- MSI (opt-in) ----
+$msiPath = Join-Path $OutDir "UselessTerminal-$version-$Arch.msi"
+if ($Msi) {
+  if (-not (Get-Command wix -ErrorAction SilentlyContinue)) {
+    throw "wix not found, so no MSI was built. Install it with: dotnet tool install -g wix --version 5.0.2   (the binary above is ready)"
+  }
+  $utilCA = if ($native) { 'X64' } else { 'A64' }
+  & wix build 'installer\UselessTerminal.wxs' -arch $Arch -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext `
+    -d "Version=$msiVersion" -d "ExePath=$((Resolve-Path $built).Path)" -d "IconPath=$((Resolve-Path 'crates\ut-app\assets\app.ico').Path)" -d "UtilCA=$utilCA" -o $msiPath
+  if ($LASTEXITCODE) { throw 'wix build failed (are the WixToolset.UI.wixext and WixToolset.Util.wixext 5.0.2 extensions installed? see the header of this script)' }
+  Write-Host "msi:    $((Resolve-Path $msiPath).Path)  ($([math]::Round((Get-Item $msiPath).Length / 1MB, 1)) MB, ProductVersion $msiVersion)"
 }
-$msi = Join-Path $OutDir "UselessTerminal-$version-$Arch.msi"
-$utilCA = if ($native) { 'X64' } else { 'A64' }
-& wix build 'installer\UselessTerminal.wxs' -arch $Arch -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext `
-  -d "Version=$msiVersion" -d "ExePath=$((Resolve-Path $built).Path)" -d "IconPath=$((Resolve-Path 'crates\ut-app\assets\app.ico').Path)" -d "UtilCA=$utilCA" -o $msi
-if ($LASTEXITCODE) { throw 'wix build failed (are the WixToolset.UI.wixext and WixToolset.Util.wixext 5.0.2 extensions installed? see the header of this script)' }
-Remove-Item "$([IO.Path]::ChangeExtension($msi, 'wixpdb'))" -ErrorAction SilentlyContinue
-Write-Host "msi:    $((Resolve-Path $msi).Path)  ($([math]::Round((Get-Item $msi).Length / 1MB, 1)) MB, ProductVersion $msiVersion)"
-if ($locked) { exit 2 }   # the MSI is fine, but dist's exe could not be updated: say so through the exit code
+
+# ---- cleanup: leave only the exe (and the MSI if asked) ----
+$keepMsi = if ($Msi) { Split-Path $msiPath -Leaf }
+Get-ChildItem -LiteralPath $OutDir -File | Where-Object { $_.Extension -in '.msi', '.wixpdb' -and $_.Name -ne $keepMsi } | Remove-Item -Force
+Remove-Item -LiteralPath (Join-Path $OutDir 'release') -Recurse -Force -ErrorAction SilentlyContinue   # publish_github.ps1 staging
+if (-not $locked) { Remove-Item -LiteralPath (Join-Path $archDir 'UselessTerminal.new.exe') -Force -ErrorAction SilentlyContinue }
+if (-not $KeepTarget) {
+  # Only a directory cargo itself created (it drops CACHEDIR.TAG in it): CARGO_TARGET_DIR may point anywhere.
+  if (Test-Path -LiteralPath (Join-Path $targetDir 'CACHEDIR.TAG')) {
+    Write-Host "removing build output: $targetDir"
+    try { Remove-Item -LiteralPath $targetDir -Recurse -Force -ErrorAction Stop }
+    catch { Write-Warning "could not remove all of ${targetDir}: $($_.Exception.Message)" }
+  } else { Write-Warning "$targetDir is not a cargo target directory: left alone." }
+}
+if ($locked) { exit 2 }   # dist's exe could not be updated: say so through the exit code
